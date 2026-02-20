@@ -1,6 +1,6 @@
 :root {
   color-scheme: dark;
-  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
 * {
@@ -12,121 +12,52 @@ body {
   min-height: 100vh;
   display: grid;
   place-items: center;
-  background: radial-gradient(circle at top, #182b58 0%, #0b1122 60%, #05070f 100%);
-  color: #ecf2ff;
+  background: radial-gradient(circle at top, #1b2f63 0%, #0d1630 55%, #070b16 100%);
+  color: #eaf1ff;
 }
 
 .app {
-  width: min(98vw, 500px);
+  width: min(100vw, 500px);
   padding: 0.75rem;
   display: grid;
-  gap: 0.7rem;
+  gap: 0.6rem;
 }
 
 .topbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 0.6rem;
 }
 
 h1 {
   margin: 0;
-  font-size: 1.2rem;
-  letter-spacing: 0.03em;
-}
-
-#restartBtn {
-  border: none;
-  background: linear-gradient(135deg, #577bff, #3bc2ff);
-  color: #fff;
-  border-radius: 999px;
-  padding: 0.45rem 0.9rem;
-  font-weight: 700;
-  cursor: pointer;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
 }
 
 .hud {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.4rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  background: rgba(15, 26, 56, 0.8);
+  border: 1px solid rgba(180, 207, 255, 0.35);
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  white-space: nowrap;
 }
 
-.hud > div {
-  background: rgba(10, 17, 34, 0.82);
-  border: 1px solid rgba(159, 192, 255, 0.25);
-  border-radius: 10px;
-  padding: 0.38rem 0.45rem;
-  display: grid;
-}
-
-.hud span {
-  opacity: 0.8;
-  font-size: 0.68rem;
-}
-
-.hud strong {
-  font-size: 0.95rem;
-  line-height: 1.2;
-}
-
-#gameCanvas {
+#game-shell {
   width: 100%;
   aspect-ratio: 9 / 16;
-  border-radius: 12px;
-  border: 2px solid rgba(180, 206, 255, 0.4);
-  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.5);
-  touch-action: none;
-  display: block;
-}
-
-.controls {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.6rem;
-}
-
-.pad {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.5rem;
-  width: 50%;
-}
-
-.controls button {
-  border: none;
   border-radius: 14px;
-  min-height: 56px;
-  font-size: 1rem;
-  font-weight: 700;
-  color: #fff;
-  background: linear-gradient(180deg, rgba(95, 135, 255, 0.95), rgba(54, 84, 175, 0.9));
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.3), 0 6px 14px rgba(0, 0, 0, 0.35);
-  opacity: 0.82;
-  cursor: pointer;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
+  overflow: hidden;
+  border: 2px solid rgba(180, 207, 255, 0.35);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.45);
+  touch-action: none;
 }
 
-.controls button:active,
-.controls button.active {
-  opacity: 1;
-  transform: translateY(1px) scale(0.99);
-}
-
-.leaderboard {
-  background: rgba(11, 18, 36, 0.85);
-  border: 1px solid rgba(149, 182, 244, 0.3);
-  border-radius: 10px;
-  padding: 0.5rem 0.7rem;
-}
-
-.leaderboard h2 {
-  margin: 0 0 0.2rem;
-  font-size: 0.95rem;
-}
-
-#leaderboardList {
-  margin: 0;
-  padding-left: 1.2rem;
-  font-size: 0.84rem;
+#game-shell canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
 }
