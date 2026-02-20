@@ -1,755 +1,398 @@
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
+const GAME_WIDTH = 720;
+const GAME_HEIGHT = 1280;
+const WORLD_WIDTH = 2600;
 
-const ui = {
-  world: document.getElementById("worldLabel"),
-  level: document.getElementById("levelLabel"),
-  lives: document.getElementById("livesLabel"),
-  coins: document.getElementById("coinsLabel"),
-  score: document.getElementById("scoreLabel"),
-  timer: document.getElementById("timerLabel"),
-  mode: document.getElementById("modeLabel"),
-  leaderboard: document.getElementById("leaderboardList"),
-  restartBtn: document.getElementById("restartBtn"),
-};
+class MainScene extends Phaser.Scene {
+  constructor() {
+    super("main");
+    this.player = null;
+    this.platforms = null;
+    this.coins = null;
+    this.enemies = null;
+    this.bgFar = null;
+    this.bgMid = null;
+    this.bgNear = null;
 
-const GAME = {
-  width: canvas.width,
-  height: canvas.height,
-  gravity: 0.52,
-  friction: 0.84,
-  maxFPSDelta: 1 / 20,
-  levelsPerWorld: 16,
-  worldCount: 8,
-};
+    this.score = 0;
+    this.lives = 3;
+    this.scoreText = null;
+    this.livesText = null;
 
-const WORLD_THEMES = [
-  { name: "Green Hills", sky: ["#8ce7ff", "#4da0ff"], ground: "#3b8d4c" },
-  { name: "Desert Ruins", sky: ["#ffd58a", "#d48f3f"], ground: "#a77c46" },
-  { name: "Ice Mountains", sky: ["#b4f1ff", "#74bbff"], ground: "#9bd6ff" },
-  { name: "Jungle", sky: ["#8de2a4", "#328a55"], ground: "#2f7148" },
-  { name: "Underground Caves", sky: ["#5f5f72", "#1f1f29"], ground: "#6c5a4d" },
-  { name: "Lava World", sky: ["#ff9a66", "#a4291a"], ground: "#8b2d21" },
-  { name: "Sky Floating Islands", sky: ["#d8f1ff", "#80beff"], ground: "#5ca07a" },
-  { name: "Dark Castle", sky: ["#626285", "#121225"], ground: "#50435e" },
-];
+    this.cursors = null;
+    this.keys = null;
+    this.jumpPressed = false;
+    this.touch = { left: false, right: false, jump: false };
 
-const ENEMY_TYPES = [
-  "Walker", "Bat", "Spiky", "Slime", "FirePlant", "NightGhost", "Lancer", "Mole",
-  "Crawler", "Wisp", "Golem", "Sentinel", "Orbiter", "Spider", "Bomber", "Ninja",
-  "Knight", "Turret", "Shade", "Rogue"
-];
+    this.respawn = { x: 140, y: 980 };
+    this.hudEl = null;
+  }
 
-const input = { left: false, right: false, jump: false, attack: false, slide: false };
-const POWER = ["Normal", "Giant", "Fire"];
+  preload() {
+    this.createTextures();
+  }
 
-const state = {
-  level: 1,
-  unlocked: 1,
-  world: 1,
-  score: 0,
-  coins: 0,
-  combo: 0,
-  lives: 3,
-  totalTime: 0,
-  levelTime: 0,
-  speedrunStart: performance.now(),
-  mode: 0,
-  bossPhase: 0,
-  ended: false,
-};
+  create() {
+    this.hudEl = document.getElementById("hudText");
 
-const player = {
-  x: 36,
-  y: 0,
-  w: 28,
-  h: 42,
-  vx: 0,
-  vy: 0,
-  speed: 1.1,
-  jumpPower: 11.3,
-  onGround: false,
-  jumpsLeft: 2,
-  facing: 1,
-  hp: 4,
-  anim: "idle",
-  slideTimer: 0,
-  attackCd: 0,
-  checkpoint: null,
-  jumpLock: false,
-};
+    this.physics.world.setBounds(0, 0, WORLD_WIDTH, GAME_HEIGHT);
 
-let levelData = null;
-let lastTs = performance.now();
-let audioCtx;
+    this.bgFar = this.add
+      .tileSprite(0, 0, WORLD_WIDTH, GAME_HEIGHT, "bgFar")
+      .setOrigin(0, 0)
+      .setScrollFactor(0.15);
 
-function ensureAudio() {
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-}
+    this.bgMid = this.add
+      .tileSprite(0, 0, WORLD_WIDTH, GAME_HEIGHT, "bgMid")
+      .setOrigin(0, 0)
+      .setScrollFactor(0.35);
 
-function sfx(freq, duration = 0.1, wave = "triangle", gain = 0.025) {
-  if (!audioCtx) return;
-  const o = audioCtx.createOscillator();
-  const g = audioCtx.createGain();
-  o.type = wave;
-  o.frequency.value = freq;
-  g.gain.value = gain;
-  o.connect(g);
-  g.connect(audioCtx.destination);
-  o.start();
-  o.stop(audioCtx.currentTime + duration);
-}
+    this.bgNear = this.add
+      .tileSprite(0, 0, WORLD_WIDTH, GAME_HEIGHT, "bgNear")
+      .setOrigin(0, 0)
+      .setScrollFactor(0.6);
 
-function playWorldMusic() {
-  if (!audioCtx) return;
-  const base = 180 + state.world * 25;
-  sfx(base, 0.2, "sine", 0.015);
-  setTimeout(() => sfx(base * 1.26, 0.22, "square", 0.012), 130);
-}
+    this.platforms = this.physics.add.staticGroup();
+    this.platforms
+      .create(WORLD_WIDTH / 2, GAME_HEIGHT - 40, "ground")
+      .setScale(14, 1)
+      .refreshBody();
 
-function clamp(v, min, max) {
-  return Math.max(min, Math.min(max, v));
-}
+    const platformData = [
+      [380, 1080], [620, 940], [880, 1040], [1120, 910], [1390, 1020],
+      [1620, 890], [1900, 980], [2180, 900], [2440, 1010],
+      [560, 780], [860, 700], [1200, 650], [1520, 730], [1850, 640], [2230, 700]
+    ];
 
-function overlap(a, b) {
-  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-}
-
-function levelToWorld(level) {
-  return Math.min(GAME.worldCount, Math.ceil(level / GAME.levelsPerWorld));
-}
-
-function createLevel(levelNum) {
-  const world = levelToWorld(levelNum);
-  const theme = WORLD_THEMES[world - 1];
-  const height = 2200 + world * 120;
-  const difficulty = 1 + levelNum * 0.06;
-
-  const solids = [{ x: 0, y: height - 38, w: GAME.width, h: 40, moving: false }];
-  const hazards = [];
-  const coins = [];
-  const enemies = [];
-  const portals = [];
-  const hiddenRooms = [];
-  const checkpoints = [];
-
-  for (let i = 0; i < 24 + world * 2; i++) {
-    const w = clamp(130 - levelNum * 0.35 + (i % 3) * 16, 66, 140);
-    const y = height - 130 - i * (64 - Math.min(28, levelNum * 0.1));
-    const x = 16 + ((Math.sin(i * 1.2 + levelNum) + 1) / 2) * (GAME.width - w - 32);
-    const moving = i % 5 === 0;
-
-    solids.push({
-      x,
-      y,
-      w,
-      h: 14,
-      moving,
-      baseX: x,
-      amp: 34 + world * 4,
-      speed: 0.5 + i * 0.02,
+    platformData.forEach(([x, y]) => {
+      this.platforms.create(x, y, "platform");
     });
 
-    if (i % 4 === 0) hazards.push({ type: "spike", x: x + 8, y: y - 10, w: 20, h: 10 });
-    if (i % 6 === 0 && world >= 3) {
-      hazards.push({ type: "lava", x: x + 12, y: y + 14, w: Math.min(44, w - 20), h: 8 });
-    }
-    if (i % 3 === 0) {
-      coins.push({
-        x: x + w * 0.5 - 6,
-        y: y - 18,
-        w: 12,
-        h: 12,
-        rare: i % 9 === 0,
-        taken: false,
+    this.player = this.physics.add.sprite(this.respawn.x, this.respawn.y, "hero-idle-1");
+    this.player.setCollideWorldBounds(true);
+    this.player.setBounce(0.05);
+    this.player.body.setSize(54, 84).setOffset(5, 6);
+
+    this.physics.add.collider(this.player, this.platforms);
+
+    this.createAnimations();
+    this.player.play("idle");
+
+    this.coins = this.physics.add.group({ allowGravity: false, immovable: true });
+    for (let i = 0; i < 24; i += 1) {
+      const x = 240 + i * 95;
+      const y = 520 + (i % 6) * 90;
+      const coin = this.coins.create(x, y, "coin");
+
+      this.tweens.add({
+        targets: coin,
+        y: y - 12,
+        duration: 600 + (i % 4) * 100,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.easeInOut",
       });
     }
 
-    if (i % 5 === 2) {
-      const et = ENEMY_TYPES[(i + world + levelNum) % ENEMY_TYPES.length];
-      enemies.push({
-        kind: et,
-        x: x + w * 0.4,
-        y: y - 20,
-        w: 20,
-        h: 20,
-        vx: (i % 2 ? 1 : -1) * (0.7 + difficulty * 0.08),
-        vy: 0,
-        hp: 1 + Math.floor(levelNum / 18),
-        t: 0,
-        dead: false,
-      });
-    }
-
-    if (i === 10 || i === 19) {
-      checkpoints.push({ x: x + 4, y: y - 32, w: 12, h: 32, active: false });
-    }
-  }
-
-  if (levelNum % 7 === 0) {
-    hiddenRooms.push({ x: 24, y: height - 500, w: 110, h: 70, open: false });
-    portals.push({ x: 32, y: height - 170, w: 24, h: 36, targetY: height - 520 });
-  }
-
-  const isBoss = levelNum % 10 === 0;
-  if (isBoss) {
-    enemies.push({
-      kind: "MainBoss",
-      x: GAME.width / 2 - 35,
-      y: 180,
-      w: 70,
-      h: 70,
-      vx: 1.2,
-      vy: 0,
-      hp: 14 + world * 3,
-      t: 0,
-      dead: false,
-      boss: true,
+    this.enemies = this.physics.add.group();
+    const enemySpawns = [760, 1260, 1730, 2060, 2360];
+    enemySpawns.forEach((x, i) => {
+      const enemy = this.enemies.create(x, GAME_HEIGHT - 96, "enemy");
+      enemy.setCollideWorldBounds(true);
+      enemy.setBounce(0.1);
+      enemy.setVelocityX(i % 2 === 0 ? 90 : -90);
+      enemy.body.setSize(58, 52).setOffset(3, 6);
     });
+
+    this.physics.add.collider(this.enemies, this.platforms);
+    this.physics.add.collider(this.enemies, this.enemies);
+
+    this.physics.add.overlap(this.player, this.coins, this.collectCoin, null, this);
+    this.physics.add.overlap(this.player, this.enemies, this.hitEnemy, null, this);
+
+    this.cameras.main.setBounds(0, 0, WORLD_WIDTH, GAME_HEIGHT);
+    this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+    this.cameras.main.setDeadzone(100, 220);
+
+    this.scoreText = this.add
+      .text(16, 16, "Score: 0", {
+        fontFamily: "Inter, sans-serif",
+        fontSize: "34px",
+        color: "#ffffff",
+        stroke: "#0a1230",
+        strokeThickness: 7,
+      })
+      .setScrollFactor(0);
+
+    this.livesText = this.add
+      .text(16, 62, "Lives: 3", {
+        fontFamily: "Inter, sans-serif",
+        fontSize: "30px",
+        color: "#ffffff",
+        stroke: "#0a1230",
+        strokeThickness: 6,
+      })
+      .setScrollFactor(0);
+
+    this.cursors = this.input.keyboard.createCursorKeys();
+    this.keys = this.input.keyboard.addKeys("A,D,W,SPACE");
+
+    this.createTouchControls();
+    this.syncHud();
   }
 
-  const goal = { x: GAME.width - 44, y: 96, w: 22, h: 30 };
-  return {
-    world,
-    theme,
-    levelNum,
-    height,
-    solids,
-    hazards,
-    coins,
-    enemies,
-    portals,
-    hiddenRooms,
-    checkpoints,
-    goal,
-    isBoss,
-  };
-}
+  update() {
+    const left = this.touch.left || this.cursors.left.isDown || this.keys.A.isDown;
+    const right = this.touch.right || this.cursors.right.isDown || this.keys.D.isDown;
+    const jump =
+      this.touch.jump || this.cursors.up.isDown || this.cursors.space.isDown || this.keys.W.isDown;
 
-function saveProgress() {
-  localStorage.setItem(
-    "neoTowerSave",
-    JSON.stringify({
-      level: state.level,
-      unlocked: state.unlocked,
-      lives: state.lives,
-      score: state.score,
-      coins: state.coins,
-      mode: state.mode,
-      speedrunStart: state.speedrunStart,
-    })
-  );
-}
-
-function loadProgress() {
-  try {
-    const raw = localStorage.getItem("neoTowerSave");
-    if (!raw) return;
-
-    const data = JSON.parse(raw);
-    state.level = clamp(data.level || 1, 1, GAME.worldCount * GAME.levelsPerWorld);
-    state.unlocked = clamp(data.unlocked || 1, 1, GAME.worldCount * GAME.levelsPerWorld);
-    state.lives = data.lives || 3;
-    state.score = data.score || 0;
-    state.coins = data.coins || 0;
-    state.mode = clamp(data.mode || 0, 0, 2);
-    state.speedrunStart = data.speedrunStart || performance.now();
-  } catch {
-    // ignore malformed save
-  }
-}
-
-function loadLeaderboard() {
-  const raw = localStorage.getItem("neoTowerBoard");
-  const list = raw ? JSON.parse(raw) : [];
-
-  ui.leaderboard.innerHTML = "";
-  for (const item of list.slice(0, 5)) {
-    const li = document.createElement("li");
-    li.textContent = `${item.name}: ${item.time.toFixed(1)}s`;
-    ui.leaderboard.appendChild(li);
-  }
-}
-
-function updateLeaderboard() {
-  const run = (performance.now() - state.speedrunStart) / 1000;
-  const raw = localStorage.getItem("neoTowerBoard");
-  const list = raw ? JSON.parse(raw) : [];
-
-  list.push({ name: "Hero", time: run });
-  list.sort((a, b) => a.time - b.time);
-
-  localStorage.setItem("neoTowerBoard", JSON.stringify(list.slice(0, 10)));
-  loadLeaderboard();
-}
-
-function resetPlayer(spawnFromCheckpoint = false) {
-  const spawnY = levelData.height - 120;
-  player.x = spawnFromCheckpoint && player.checkpoint ? player.checkpoint.x : 24;
-  player.y = spawnFromCheckpoint && player.checkpoint ? player.checkpoint.y : spawnY;
-  player.vx = 0;
-  player.vy = 0;
-  player.jumpsLeft = 2;
-}
-
-function startLevel(level) {
-  state.level = level;
-  state.world = levelToWorld(level);
-  state.levelTime = 0;
-  state.bossPhase = 0;
-  levelData = createLevel(level);
-
-  player.w = state.mode === 1 ? 38 : 28;
-  player.h = state.mode === 1 ? 52 : 42;
-  player.checkpoint = null;
-  player.jumpLock = false;
-
-  resetPlayer(false);
-  playWorldMusic();
-  saveProgress();
-}
-
-function loseLife() {
-  state.lives -= 1;
-  sfx(170, 0.2, "sawtooth", 0.035);
-
-  if (state.lives <= 0) {
-    state.level = 1;
-    state.lives = 3;
-    state.score = 0;
-    state.coins = 0;
-    state.mode = 0;
-    state.speedrunStart = performance.now();
-  }
-
-  startLevel(state.level);
-}
-
-function awardCoins(amount, comboBonus = true) {
-  state.coins += amount;
-  if (comboBonus) state.combo += 1;
-
-  if (state.combo >= 4) {
-    state.score += 25 * state.combo;
-    state.combo = 0;
-  }
-
-  if (state.coins >= 100) {
-    state.coins -= 100;
-    state.lives += 1;
-    sfx(980, 0.18, "square", 0.03);
-  }
-}
-
-function spawnProjectile() {
-  if (player.attackCd > 0) return;
-
-  player.attackCd = 0.25;
-  if (state.mode === 2) {
-    levelData.enemies.push({
-      kind: "PlayerFire",
-      x: player.x + player.w / 2,
-      y: player.y + 8,
-      w: 10,
-      h: 6,
-      vx: player.facing * 5.2,
-      vy: 0,
-      hp: 1,
-      t: 0,
-      dead: false,
-      friendly: true,
+    this.enemies.children.iterate((enemy) => {
+      if (!enemy) return;
+      if (enemy.body.blocked.left) enemy.setVelocityX(90);
+      if (enemy.body.blocked.right) enemy.setVelocityX(-90);
     });
-    sfx(720, 0.08, "square", 0.022);
-  } else {
-    sfx(420, 0.04, "triangle", 0.018);
-  }
-}
 
-function handleInput() {
-  const accel = player.slideTimer > 0 ? 0.5 : player.speed;
-
-  if (input.left) {
-    player.vx -= accel;
-    player.facing = -1;
-  }
-  if (input.right) {
-    player.vx += accel;
-    player.facing = 1;
-  }
-
-  if (input.slide && player.onGround && Math.abs(player.vx) > 1.2 && player.slideTimer <= 0) {
-    player.slideTimer = 0.28;
-    sfx(240, 0.05, "sawtooth", 0.015);
-  }
-
-  if (input.jump && player.jumpsLeft > 0 && !player.jumpLock) {
-    player.vy = -player.jumpPower;
-    player.jumpsLeft -= 1;
-    player.jumpLock = true;
-    sfx(560, 0.09, "square", 0.024);
-  }
-
-  if (!input.jump) player.jumpLock = false;
-  if (input.attack) spawnProjectile();
-}
-
-function updateEnemies(dt) {
-  for (const e of levelData.enemies) {
-    if (e.dead) continue;
-    e.t += dt;
-
-    if (e.friendly) {
-      e.x += e.vx;
-      if (e.x < -30 || e.x > GAME.width + 30) e.dead = true;
-      continue;
-    }
-
-    if (e.boss) {
-      e.x += e.vx;
-      if (e.x < 20 || e.x + e.w > GAME.width - 20) e.vx *= -1;
-
-      if (e.hp < 10) state.bossPhase = 1;
-      if (e.hp < 5) state.bossPhase = 2;
-
-      if (state.bossPhase >= 1 && Math.random() < 0.015) {
-        levelData.hazards.push({
-          type: "fireball",
-          x: e.x + e.w / 2,
-          y: e.y + e.h,
-          w: 10,
-          h: 14,
-          vy: 2.5 + state.bossPhase,
-        });
-      }
-    } else if (e.kind.includes("Bat") || e.kind.includes("Ghost") || e.kind.includes("Wisp")) {
-      e.x += e.vx;
-      e.y += Math.sin(e.t * 3) * 0.7;
-    } else if (e.kind.includes("Slime") || e.kind.includes("Spider")) {
-      e.x += e.vx;
-      if (Math.random() < 0.01) e.vy = -5.5;
-      e.vy += GAME.gravity * 0.4;
-      e.y += e.vy;
-      if (e.y > levelData.height - 58) {
-        e.y = levelData.height - 58;
-        e.vy = 0;
-      }
+    if (left) {
+      this.player.setVelocityX(-280);
+      this.player.setFlipX(true);
+    } else if (right) {
+      this.player.setVelocityX(280);
+      this.player.setFlipX(false);
     } else {
-      e.x += e.vx;
+      this.player.setVelocityX(0);
     }
 
-    if (e.x < 12 || e.x + e.w > GAME.width - 12) e.vx *= -1;
-
-    if (overlap(player, e)) {
-      if (player.vy > 1.5 && !e.boss) {
-        e.dead = true;
-        player.vy = -6;
-        state.score += 60;
-        sfx(820, 0.08, "triangle", 0.022);
-      } else {
-        loseLife();
-        return;
-      }
+    if (jump && this.player.body.blocked.down && !this.jumpPressed) {
+      this.player.setVelocityY(-620);
+      this.jumpPressed = true;
     }
-  }
+    if (!jump) this.jumpPressed = false;
 
-  for (const p of levelData.enemies.filter((x) => x.friendly && !x.dead)) {
-    for (const e of levelData.enemies.filter((x) => !x.friendly && !x.dead)) {
-      if (overlap(p, e)) {
-        e.hp -= 1;
-        p.dead = true;
+    if (!this.player.body.blocked.down) {
+      this.player.play("jump", true);
+    } else if (Math.abs(this.player.body.velocity.x) > 25) {
+      this.player.play("run", true);
+    } else {
+      this.player.play("idle", true);
+    }
 
-        if (e.hp <= 0) {
-          e.dead = true;
-          state.score += e.boss ? 900 : 120;
-          sfx(920, 0.11, "square", 0.024);
-        }
-      }
+    this.bgFar.tilePositionX = this.cameras.main.scrollX * 0.08;
+    this.bgMid.tilePositionX = this.cameras.main.scrollX * 0.18;
+    this.bgNear.tilePositionX = this.cameras.main.scrollX * 0.3;
+
+    if (this.player.y > GAME_HEIGHT + 100) {
+      this.loseLife();
     }
   }
 
-  levelData.enemies = levelData.enemies.filter((e) => !e.dead);
-}
-
-function update(dt) {
-  if (state.ended) return;
-
-  state.levelTime += dt;
-  state.totalTime += dt;
-  player.attackCd = Math.max(0, player.attackCd - dt);
-  player.slideTimer = Math.max(0, player.slideTimer - dt);
-
-  handleInput();
-
-  player.vx *= GAME.friction;
-  player.vy += GAME.gravity;
-  player.x += player.vx;
-  player.y += player.vy;
-
-  player.x = clamp(player.x, 0, GAME.width - player.w);
-
-  player.onGround = false;
-  for (const s of levelData.solids) {
-    if (s.moving) s.x = s.baseX + Math.sin(state.totalTime * s.speed) * s.amp;
-
-    const prevBottom = player.y + player.h - player.vy;
-    const currBottom = player.y + player.h;
-
-    if (
-      player.x + player.w > s.x &&
-      player.x < s.x + s.w &&
-      prevBottom <= s.y &&
-      currBottom >= s.y &&
-      player.vy >= 0
-    ) {
-      player.y = s.y - player.h;
-      player.vy = 0;
-      player.onGround = true;
-      player.jumpsLeft = 2;
-    }
+  collectCoin(_player, coin) {
+    coin.disableBody(true, true);
+    this.score += 10;
+    this.scoreText.setText(`Score: ${this.score}`);
+    this.syncHud();
   }
 
-  for (const hz of levelData.hazards) {
-    if (hz.type === "fireball") {
-      hz.y += hz.vy;
-      if (hz.y > levelData.height + 100) hz.dead = true;
-    }
-
-    if (overlap(player, hz)) {
-      loseLife();
-      return;
-    }
-  }
-  levelData.hazards = levelData.hazards.filter((h) => !h.dead);
-
-  for (const c of levelData.coins) {
-    if (!c.taken && overlap(player, c)) {
-      c.taken = true;
-      awardCoins(c.rare ? 10 : 1, true);
-      state.score += c.rare ? 150 : 15;
-      sfx(c.rare ? 1180 : 920, 0.08, "sine", 0.02);
-    }
-  }
-
-  for (const p of levelData.portals) {
-    if (overlap(player, p)) {
-      player.y = p.targetY;
-      sfx(640, 0.13, "triangle", 0.02);
-    }
-  }
-
-  for (const cp of levelData.checkpoints) {
-    if (overlap(player, cp)) {
-      cp.active = true;
-      player.checkpoint = { x: cp.x, y: cp.y - 40 };
-      state.score += 40;
-    }
-  }
-
-  updateEnemies(dt);
-
-  if (player.y > levelData.height + 120) {
-    loseLife();
-    return;
-  }
-
-  if (overlap(player, levelData.goal)) {
-    if (levelData.isBoss && levelData.enemies.some((e) => e.boss)) return;
-
-    state.score += 250 + Math.max(0, 90 - Math.floor(state.levelTime * 2));
-    state.unlocked = Math.max(state.unlocked, state.level + 1);
-
-    if (state.level >= GAME.levelsPerWorld * GAME.worldCount) {
-      state.ended = true;
-      updateLeaderboard();
-      sfx(1040, 0.22, "square", 0.03);
+  hitEnemy(player, enemy) {
+    if (player.body.velocity.y > 120 && player.y < enemy.y - 20) {
+      enemy.disableBody(true, true);
+      player.setVelocityY(-420);
+      this.score += 25;
+      this.scoreText.setText(`Score: ${this.score}`);
+      this.syncHud();
       return;
     }
 
-    if (state.level % 5 === 0) state.mode = (state.mode + 1) % 3;
-    startLevel(state.level + 1);
-  }
-}
-
-function drawBackground() {
-  const grd = ctx.createLinearGradient(0, 0, 0, GAME.height);
-  grd.addColorStop(0, levelData.theme.sky[0]);
-  grd.addColorStop(1, levelData.theme.sky[1]);
-  ctx.fillStyle = grd;
-  ctx.fillRect(0, 0, GAME.width, GAME.height);
-
-  for (let i = 0; i < 5; i++) {
-    const py = ((i * 160 + state.totalTime * 10) % (GAME.height + 120)) - 60;
-    ctx.fillStyle = "rgba(255,255,255,0.18)";
-    ctx.beginPath();
-    ctx.arc(70 + i * 70, py, 24, 0, Math.PI * 2);
-    ctx.fill();
+    this.loseLife();
   }
 
-  ctx.fillStyle = "rgba(0,0,0,0.18)";
-  ctx.fillRect(0, GAME.height - 34, GAME.width, 34);
-}
+  loseLife() {
+    this.lives -= 1;
+    this.livesText.setText(`Lives: ${this.lives}`);
+    this.syncHud();
 
-function drawEntityBox(e, cameraY, color) {
-  ctx.fillStyle = color;
-  ctx.fillRect(e.x, e.y - cameraY, e.w, e.h);
-}
+    if (this.lives <= 0) {
+      this.score = 0;
+      this.lives = 3;
+      this.scene.restart();
+      return;
+    }
 
-function drawPlayer(cameraY) {
-  const modeColor = ["#325cff", "#48b067", "#ff813a"][state.mode];
-  const bodyY = player.y - cameraY;
-  player.anim = player.onGround ? (Math.abs(player.vx) > 0.6 ? "run" : "idle") : player.vy < 0 ? "jump" : "fall";
-
-  drawEntityBox({ x: player.x, y: player.y, w: player.w, h: player.h }, cameraY, modeColor);
-  ctx.fillStyle = "#f4d1aa";
-  ctx.fillRect(player.x + 8, bodyY + 8, player.w - 14, 12);
-  ctx.fillStyle = "#141419";
-  ctx.fillRect(player.x + (player.facing > 0 ? player.w - 10 : 4), bodyY + 13, 3, 3);
-
-  if (player.slideTimer > 0) {
-    ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.fillRect(player.x - 4, bodyY + player.h - 8, player.w + 8, 4);
-  }
-}
-
-function drawWorld(cameraY) {
-  for (const s of levelData.solids) drawEntityBox(s, cameraY, levelData.theme.ground);
-  for (const hz of levelData.hazards) {
-    drawEntityBox(
-      hz,
-      cameraY,
-      hz.type === "spike" ? "#dce7ff" : hz.type === "lava" ? "#ff5b32" : "#ffb22a"
-    );
+    this.player.setPosition(this.respawn.x, this.respawn.y);
+    this.player.setVelocity(0, 0);
   }
 
-  for (const c of levelData.coins) {
-    if (c.taken) continue;
-    ctx.fillStyle = c.rare ? "#ffdf47" : "#ffe78c";
-    ctx.fillRect(c.x, c.y - cameraY, c.w, c.h);
+  createTouchControls() {
+    const makeButton = (x, y, label) => {
+      const circle = this.add
+        .circle(x, y, 62, 0x2c4fa8, 0.62)
+        .setScrollFactor(0)
+        .setDepth(20)
+        .setInteractive();
+
+      this.add
+        .text(x, y, label, {
+          fontFamily: "Inter, sans-serif",
+          fontSize: "34px",
+          color: "#ffffff",
+          fontStyle: "700",
+        })
+        .setOrigin(0.5)
+        .setScrollFactor(0)
+        .setDepth(21);
+
+      return circle;
+    };
+
+    const leftBtn = makeButton(85, 1180, "◀");
+    const rightBtn = makeButton(225, 1180, "▶");
+    const jumpBtn = makeButton(635, 1180, "⤒");
+
+    this.bindTouchButton(leftBtn, "left");
+    this.bindTouchButton(rightBtn, "right");
+    this.bindTouchButton(jumpBtn, "jump");
   }
 
-  for (const p of levelData.portals) drawEntityBox(p, cameraY, "#8f64ff");
-  for (const cp of levelData.checkpoints) drawEntityBox(cp, cameraY, cp.active ? "#4dffae" : "#6aa2ff");
-
-  for (const hr of levelData.hiddenRooms) {
-    if (Math.abs(player.x - hr.x) < 80 && Math.abs(player.y - hr.y) < 100) hr.open = true;
-    if (hr.open) drawEntityBox(hr, cameraY, "#d7cdb5");
+  bindTouchButton(button, action) {
+    button.on("pointerdown", () => {
+      this.touch[action] = true;
+    });
+    button.on("pointerup", () => {
+      this.touch[action] = false;
+    });
+    button.on("pointerout", () => {
+      this.touch[action] = false;
+    });
+    button.on("pointerupoutside", () => {
+      this.touch[action] = false;
+    });
   }
 
-  for (const e of levelData.enemies) {
-    const color = e.boss ? "#a20f3a" : e.friendly ? "#ffb655" : "#2a2430";
-    drawEntityBox(e, cameraY, color);
-
-    if (e.boss) {
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(12, 12, 180, 10);
-      ctx.fillStyle = "#ff4d7e";
-      const maxHp = 14 + levelData.world * 3;
-      ctx.fillRect(12, 12, (e.hp / maxHp) * 180, 10);
+  syncHud() {
+    if (this.hudEl) {
+      this.hudEl.textContent = `Score: ${this.score} | Lives: ${this.lives}`;
     }
   }
 
-  drawEntityBox(levelData.goal, cameraY, "#ffd54f");
-}
+  createAnimations() {
+    this.anims.create({
+      key: "idle",
+      frames: [{ key: "hero-idle-1" }, { key: "hero-idle-2" }],
+      frameRate: 4,
+      repeat: -1,
+    });
 
-function drawEnding() {
-  ctx.fillStyle = "rgba(0,0,0,0.72)";
-  ctx.fillRect(0, 0, GAME.width, GAME.height);
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 30px sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("Cinematic Ending", GAME.width / 2, 190);
-  ctx.font = "18px sans-serif";
-  ctx.fillText("The Dark Castle has fallen.", GAME.width / 2, 230);
-  ctx.fillText("Credits: Design, Code, Hero - You", GAME.width / 2, 270);
-  ctx.fillText("Thanks for playing NeoTower Quest!", GAME.width / 2, 300);
-}
+    this.anims.create({
+      key: "run",
+      frames: [
+        { key: "hero-run-1" },
+        { key: "hero-run-2" },
+        { key: "hero-run-3" },
+        { key: "hero-run-4" },
+      ],
+      frameRate: 12,
+      repeat: -1,
+    });
 
-function render() {
-  const cameraY = clamp(player.y - GAME.height * 0.55, 0, Math.max(0, levelData.height - GAME.height));
-  drawBackground();
-  drawWorld(cameraY);
-  drawPlayer(cameraY);
-  if (state.ended) drawEnding();
-}
-
-function syncHUD() {
-  ui.world.textContent = `${state.world} - ${WORLD_THEMES[state.world - 1].name}`;
-  ui.level.textContent = `${state.level}/${GAME.worldCount * GAME.levelsPerWorld}`;
-  ui.lives.textContent = String(state.lives);
-  ui.coins.textContent = String(state.coins);
-  ui.score.textContent = String(state.score);
-  ui.timer.textContent = `${((performance.now() - state.speedrunStart) / 1000).toFixed(1)}s`;
-  ui.mode.textContent = `${POWER[state.mode]} (${player.anim})`;
-}
-
-function tick(ts) {
-  const dt = Math.min(GAME.maxFPSDelta, (ts - lastTs) / 1000);
-  lastTs = ts;
-  update(dt);
-  render();
-  syncHUD();
-  requestAnimationFrame(tick);
-}
-
-function bindControls() {
-  window.addEventListener("keydown", (e) => {
-    ensureAudio();
-    if (["ArrowLeft", "a", "A"].includes(e.key)) input.left = true;
-    if (["ArrowRight", "d", "D"].includes(e.key)) input.right = true;
-    if (["ArrowUp", "w", "W", " "].includes(e.key)) input.jump = true;
-    if (["ArrowDown", "s", "S"].includes(e.key)) input.slide = true;
-    if (["x", "X", "k", "K"].includes(e.key)) input.attack = true;
-  });
-
-  window.addEventListener("keyup", (e) => {
-    if (["ArrowLeft", "a", "A"].includes(e.key)) input.left = false;
-    if (["ArrowRight", "d", "D"].includes(e.key)) input.right = false;
-    if (["ArrowUp", "w", "W", " "].includes(e.key)) input.jump = false;
-    if (["ArrowDown", "s", "S"].includes(e.key)) input.slide = false;
-    if (["x", "X", "k", "K"].includes(e.key)) input.attack = false;
-  });
-
-  for (const btn of document.querySelectorAll(".controls button")) {
-    const action = btn.dataset.action;
-
-    const press = () => {
-      ensureAudio();
-      btn.classList.add("active");
-      if (action === "left") input.left = true;
-      if (action === "right") input.right = true;
-      if (action === "jump") input.jump = true;
-      if (action === "attack") input.attack = true;
-    };
-
-    const release = () => {
-      btn.classList.remove("active");
-      if (action === "left") input.left = false;
-      if (action === "right") input.right = false;
-      if (action === "jump") input.jump = false;
-      if (action === "attack") input.attack = false;
-    };
-
-    btn.addEventListener("pointerdown", press);
-    btn.addEventListener("pointerup", release);
-    btn.addEventListener("pointerleave", release);
-    btn.addEventListener("pointercancel", release);
+    this.anims.create({
+      key: "jump",
+      frames: [{ key: "hero-jump" }],
+      frameRate: 1,
+      repeat: -1,
+    });
   }
 
-  ui.restartBtn.addEventListener("click", () => {
-    state.level = 1;
-    state.unlocked = 1;
-    state.lives = 3;
-    state.coins = 0;
-    state.score = 0;
-    state.mode = 0;
-    state.ended = false;
-    state.speedrunStart = performance.now();
-    startLevel(1);
-  });
+  createTextures() {
+    const g = this.make.graphics({ x: 0, y: 0, add: false });
+
+    const makeRectTexture = (key, w, h, bodyColor, faceColor = null) => {
+      g.clear();
+      g.fillStyle(bodyColor, 1);
+      g.fillRoundedRect(0, 0, w, h, 12);
+      if (faceColor !== null) {
+        g.fillStyle(faceColor, 1);
+        g.fillRoundedRect(8, 8, w - 16, Math.max(10, h * 0.35), 8);
+      }
+      g.generateTexture(key, w, h);
+    };
+
+    g.clear();
+    g.fillStyle(0x6f462e, 1);
+    g.fillRect(0, 0, 160, 28);
+    g.fillStyle(0x4cc065, 1);
+    g.fillRect(0, 0, 160, 8);
+    g.generateTexture("platform", 160, 28);
+
+    g.clear();
+    g.fillStyle(0x5d402b, 1);
+    g.fillRect(0, 0, 220, 40);
+    g.fillStyle(0x45b45d, 1);
+    g.fillRect(0, 0, 220, 10);
+    g.generateTexture("ground", 220, 40);
+
+    makeRectTexture("hero-idle-1", 64, 92, 0x2f62ff, 0xf0caa0);
+    makeRectTexture("hero-idle-2", 64, 92, 0x3b6fff, 0xe8be90);
+    makeRectTexture("hero-run-1", 64, 92, 0x3f7bff, 0xf0caa0);
+    makeRectTexture("hero-run-2", 64, 92, 0x2a5cff, 0xf0caa0);
+    makeRectTexture("hero-run-3", 64, 92, 0x3668ff, 0xeebf8a);
+    makeRectTexture("hero-run-4", 64, 92, 0x2d60ff, 0xf0caa0);
+    makeRectTexture("hero-jump", 64, 92, 0x4a83ff, 0xf3d2ad);
+
+    g.clear();
+    g.fillStyle(0xffe066, 1);
+    g.fillCircle(18, 18, 16);
+    g.lineStyle(4, 0xf8be35, 1);
+    g.strokeCircle(18, 18, 16);
+    g.generateTexture("coin", 36, 36);
+
+    makeRectTexture("enemy", 64, 58, 0xa03440, 0xf2c6c8);
+
+    g.clear();
+    g.fillStyle(0x8fd8ff, 1);
+    g.fillRect(0, 0, 256, 256);
+    g.fillStyle(0xc9edff, 1);
+    g.fillCircle(60, 56, 24);
+    g.fillCircle(95, 58, 26);
+    g.fillCircle(130, 60, 22);
+    g.generateTexture("bgFar", 256, 256);
+
+    g.clear();
+    g.fillStyle(0x60b7ff, 1);
+    g.fillRect(0, 0, 256, 256);
+    g.fillStyle(0x87d2ff, 1);
+    g.fillTriangle(0, 210, 70, 120, 140, 210);
+    g.fillTriangle(120, 210, 190, 115, 256, 210);
+    g.generateTexture("bgMid", 256, 256);
+
+    g.clear();
+    g.fillStyle(0x4a9cff, 1);
+    g.fillRect(0, 0, 256, 256);
+    g.fillStyle(0x3e8cf0, 1);
+    g.fillRect(0, 190, 256, 66);
+    g.generateTexture("bgNear", 256, 256);
+
+    g.destroy();
+  }
 }
 
-loadProgress();
-loadLeaderboard();
-bindControls();
-startLevel(state.level);
-requestAnimationFrame(tick);
+const config = {
+  type: Phaser.AUTO,
+  width: GAME_WIDTH,
+  height: GAME_HEIGHT,
+  parent: "game-shell",
+  backgroundColor: "#6bc4ff",
+  physics: {
+    default: "arcade",
+    arcade: {
+      gravity: { y: 1200 },
+      debug: false,
+    },
+  },
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+  },
+  scene: [MainScene],
+};
+
+new Phaser.Game(config);
+        
