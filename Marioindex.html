@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portrait Platformer - 100 Levels</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <header>
+      <h1>Portrait Platformer</h1>
+      <p class="subtitle">Tap or use arrow keys to play through all 100 levels.</p>
+    </header>
+
+    <section class="hud">
+      <div>Level: <span id="levelLabel">1</span>/100</div>
+      <div>Lives: <span id="livesLabel">3</span></div>
+      <button id="restartBtn" type="button">Restart</button>
+    </section>
+
+    <canvas id="gameCanvas" width="420" height="760" aria-label="Game canvas"></canvas>
+
+    <section class="controls" aria-label="Touch controls">
+      <button data-action="left" type="button">◀</button>
+      <button data-action="jump" type="button">⤒</button>
+      <button data-action="right" type="button">▶</button>
+    </section>
+  </main>
+
+  <script src="game.js"></script>
+</body>
+</html>
