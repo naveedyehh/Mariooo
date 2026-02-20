@@ -1,57 +1,56 @@
- (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
-diff --git a/index.html b/index.html
-new file mode 100644
-index 0000000000000000000000000000000000000000..1a36bfa81c14ed3618a66df40d49b40d33fbcf54
---- /dev/null
-+++ b/index.html
-@@ -0,0 +1,47 @@
-+<!DOCTYPE html>
-+<html lang="en">
-+<head>
-+  <meta charset="UTF-8" />
-+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-+  <title>NeoTower Quest - Portrait Platformer</title>
-+  <link rel="stylesheet" href="style.css" />
-+</head>
-+<body>
-+  <main class="app">
-+    <header class="topbar">
-+      <h1>NeoTower Quest</h1>
-+      <button id="restartBtn" type="button">Restart</button>
-+    </header>
-+
-+    <section class="hud">
-+      <div><span>World</span><strong id="worldLabel">1</strong></div>
-+      <div><span>Level</span><strong id="levelLabel">1</strong></div>
-+      <div><span>Lives</span><strong id="livesLabel">3</strong></div>
-+      <div><span>Coins</span><strong id="coinsLabel">0</strong></div>
-+      <div><span>Score</span><strong id="scoreLabel">0</strong></div>
-+      <div><span>Timer</span><strong id="timerLabel">0.0s</strong></div>
-+      <div><span>Mode</span><strong id="modeLabel">Normal</strong></div>
-+    </section>
-+
-+    <canvas id="gameCanvas" width="432" height="768" aria-label="Portrait platformer game canvas"></canvas>
-+
-+    <section class="controls" aria-label="Touch controls">
-+      <div class="pad left-pad">
-+        <button data-action="left" type="button">◀</button>
-+        <button data-action="right" type="button">▶</button>
-+      </div>
-+      <div class="pad right-pad">
-+        <button data-action="jump" type="button">Jump</button>
-+        <button data-action="attack" type="button">Attack</button>
-+      </div>
-+    </section>
-+
-+    <section class="leaderboard">
-+      <h2>Speedrun Board</h2>
-+      <ol id="leaderboardList"></ol>
-+    </section>
-+  </main>
-+
-+  <script src="game.js"></script>
-+</body>
-+</html>
- 
-EOF
-)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+  />
+  <meta name="theme-color" content="#0b1122" />
+  <title>NeoTower Quest</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app" role="application" aria-label="NeoTower Quest Game">
+    <header class="topbar">
+      <h1>NeoTower Quest</h1>
+      <button id="restartBtn" type="button" aria-label="Restart game">Restart</button>
+    </header>
+
+    <section class="hud" aria-label="Game HUD">
+      <div><span>World</span><strong id="worldLabel">1</strong></div>
+      <div><span>Level</span><strong id="levelLabel">1</strong></div>
+      <div><span>Lives</span><strong id="livesLabel">3</strong></div>
+      <div><span>Coins</span><strong id="coinsLabel">0</strong></div>
+      <div><span>Score</span><strong id="scoreLabel">0</strong></div>
+      <div><span>Timer</span><strong id="timerLabel">0.0s</strong></div>
+      <div><span>Mode</span><strong id="modeLabel">Normal</strong></div>
+    </section>
+
+    <canvas
+      id="gameCanvas"
+      width="432"
+      height="768"
+      aria-label="Portrait platformer game canvas"
+    ></canvas>
+
+    <section class="controls" aria-label="Touch controls">
+      <div class="pad left-pad" aria-label="Movement controls">
+        <button data-action="left" type="button" aria-label="Move left">◀</button>
+        <button data-action="right" type="button" aria-label="Move right">▶</button>
+      </div>
+      <div class="pad right-pad" aria-label="Action controls">
+        <button data-action="jump" type="button" aria-label="Jump">Jump</button>
+        <button data-action="attack" type="button" aria-label="Attack">Attack</button>
+      </div>
+    </section>
+
+    <section class="leaderboard" aria-label="Speedrun leaderboard">
+      <h2>Speedrun Board</h2>
+      <ol id="leaderboardList"></ol>
+    </section>
+  </main>
+
+  <script src="game.js"></script>
+</body>
+</html>
