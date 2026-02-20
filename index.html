@@ -1,33 +1,57 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Portrait Platformer - 100 Levels</title>
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-  <main class="app">
-    <header>
-      <h1>Portrait Platformer</h1>
-      <p class="subtitle">Tap or use arrow keys to play through all 100 levels.</p>
-    </header>
-
-    <section class="hud">
-      <div>Level: <span id="levelLabel">1</span>/100</div>
-      <div>Lives: <span id="livesLabel">3</span></div>
-      <button id="restartBtn" type="button">Restart</button>
-    </section>
-
-    <canvas id="gameCanvas" width="420" height="760" aria-label="Game canvas"></canvas>
-
-    <section class="controls" aria-label="Touch controls">
-      <button data-action="left" type="button">◀</button>
-      <button data-action="jump" type="button">⤒</button>
-      <button data-action="right" type="button">▶</button>
-    </section>
-  </main>
-
-  <script src="game.js"></script>
-</body>
-</html>
+ (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
+diff --git a/index.html b/index.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..1a36bfa81c14ed3618a66df40d49b40d33fbcf54
+--- /dev/null
++++ b/index.html
+@@ -0,0 +1,47 @@
++<!DOCTYPE html>
++<html lang="en">
++<head>
++  <meta charset="UTF-8" />
++  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
++  <title>NeoTower Quest - Portrait Platformer</title>
++  <link rel="stylesheet" href="style.css" />
++</head>
++<body>
++  <main class="app">
++    <header class="topbar">
++      <h1>NeoTower Quest</h1>
++      <button id="restartBtn" type="button">Restart</button>
++    </header>
++
++    <section class="hud">
++      <div><span>World</span><strong id="worldLabel">1</strong></div>
++      <div><span>Level</span><strong id="levelLabel">1</strong></div>
++      <div><span>Lives</span><strong id="livesLabel">3</strong></div>
++      <div><span>Coins</span><strong id="coinsLabel">0</strong></div>
++      <div><span>Score</span><strong id="scoreLabel">0</strong></div>
++      <div><span>Timer</span><strong id="timerLabel">0.0s</strong></div>
++      <div><span>Mode</span><strong id="modeLabel">Normal</strong></div>
++    </section>
++
++    <canvas id="gameCanvas" width="432" height="768" aria-label="Portrait platformer game canvas"></canvas>
++
++    <section class="controls" aria-label="Touch controls">
++      <div class="pad left-pad">
++        <button data-action="left" type="button">◀</button>
++        <button data-action="right" type="button">▶</button>
++      </div>
++      <div class="pad right-pad">
++        <button data-action="jump" type="button">Jump</button>
++        <button data-action="attack" type="button">Attack</button>
++      </div>
++    </section>
++
++    <section class="leaderboard">
++      <h2>Speedrun Board</h2>
++      <ol id="leaderboardList"></ol>
++    </section>
++  </main>
++
++  <script src="game.js"></script>
++</body>
++</html>
+ 
+EOF
+)
